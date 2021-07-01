@@ -16,6 +16,7 @@ function bufmt:set(x,y,r,g,b)
 	if not r then
 		self[postoid(x,y)]=false
 	else
+		self.empty=false
 		assert(r and g and b)
 		for k,v in ipairs{r,g,b} do
 			assert(v>=0 and v<=5)
@@ -28,6 +29,15 @@ function bufmt:get(x,y)
 	if not s then return end
 	local r,g,b=unpack(s)
 	return c-1-r,c-1-g,c-1-b
+end
+function bufmt:clear()
+	if not self.empty then
+		for x=1,self.w do
+			for y=1,self.h do
+				self[postoid(x,y)]=false
+			end
+		end
+	end
 end
 if minetest then
 	function texgen.buf_to_string(buf)
@@ -48,6 +58,7 @@ function texgen.buf_new(w,h)
 	local buf={}
 	buf.w=w
 	buf.h=h
+	buf.empty=true
 	for x=1,buf.w do
 		for y=1,buf.h do
 			buf[postoid(x,y)]=false
