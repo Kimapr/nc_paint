@@ -38,7 +38,10 @@ local obj1={"#this shitty object is shittomatically generated\no Le_NodePaint"}
 local obj2={}
 local pp={{{-0.5,-0.5,0.5},{-0.5,0.5,0.5},{0.5,0.5,0.5},{0.5,-0.5,0.5}},{{1,0},{1,1},{0,1},{0,0}},{{0,0,-1},{0,0,-1},{0,0,-1},{0,0,-1}}}
 for k,v in ipairs(pp[1]) do
-	v[3]=v[3]*127/128
+	local mul=127/128
+	v[2]=v[2]/mul
+	v[1]=v[1]/mul
+	v[3]=v[3]*mul
 end
 local function rot1(x,y,z)
 	return -z,y,x
