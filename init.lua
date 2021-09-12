@@ -146,16 +146,16 @@ faces[postoid(0,0,1)]=3
 faces[postoid(1,0,0)]=4
 faces[postoid(0,-1,0)]=5
 faces[postoid(0,1,0)]=6
-local function waitdraw(pos,below,pid,x,y,ur,ug,ub,sh)
+local function waitdraw(pl,pos,below,pid,x,y,ur,ug,ub,sh)
 	if not nodecore.writing_writable(below) or minetest.get_node(pos).name~=modname..":painting" then return end
 	local pb=database[minetest.pos_to_string(pos)]
 	if not pb then
-		minetest.after(0,waitdraw,pos,below,pid,x,y,ur,ug,ub,sh)
+		minetest.after(0,waitdraw,pl,pos,below,pid,x,y,ur,ug,ub,sh)
 		return
 	end
 	local buf=pb.bufs[pid]
 	buf.dirty=true
-	print("BUFSET",x,y,ur,ug,ub)
+	--print("BUFSET",x,y,ur,ug,ub)
 	local x1,y1,x2,y2=x,y,x,y
 	if sh then
 		x1,y1=x1-1,y1-1
@@ -164,7 +164,30 @@ local function waitdraw(pos,below,pid,x,y,ur,ug,ub,sh)
 	local rx,ry=x,y
 	for x=x1,x2 do for y=y1,y2 do
 		if x==rx and y==ry then
-			buf:set(x,y,ur,ug,ub)
+			local our,oug,oub=buf:get(x,y)
+			if our~=ur or oug~=ug or oub~=ub then
+				local wi=pl:get_wielded_item()
+				local def=minetest.registered_items[wi:get_name()] or {}
+				if def.groups and def.groups.nc_paint and def.groups.nc_paint>0 then
+					local aur,aug,aub=unpack(def.nc_paint_color or {})
+					if aur==ur and aug==ug and aub==ub then
+						--print("WEAR")
+						local ss=math.floor(65535/256)
+						local wear=wi:get_wear()+ss
+						if wear>=65535 then
+							wi:take_item(1)
+						else
+							wi:set_wear(wear)
+						end
+						pl:set_wielded_item(wi)
+						buf:set(x,y,ur,ug,ub)
+					else
+						--print("BBBBBBBB")
+					end
+				else
+					--print("AAAAAAAA",minetest.get_item_group(wi,"nc_paint"),wi:get_name(),wi:get_count())
+				end
+			end
 		else
 			assert(sh,string.format("range: (%s %s; %s %s); xy: (%s %s); rxy: (%s %s)",x1,y1,x2,y2,x,y,rx,ry,x==rx and y==ry))
 			local mx,my=math.floor((x-1)/w),math.floor((y-1)/w)
@@ -185,20 +208,22 @@ local function waitdraw(pos,below,pid,x,y,ur,ug,ub,sh)
 			local op={x=ox,y=oy,z=oz}
 			local pos=vector.add(pos,op)
 			local below=vector.add(below,op)
-			print("chachacha",x,y,x-mx*w,y-my*w)
-			if nodecore.writing_writable(below) and nodecore.buildable_to(pos) then
+			--print("chachacha",x,y,x-mx*w,y-my*w)
+			local abname=minetest.get_node(pos).name
+			if nodecore.writing_writable(below) and (abname=="air" or abname==modname..":painting") then
 				if minetest.get_node_or_nil(pos) and minetest.get_node(pos).name~=modname..":painting" then
 					minetest.set_node(pos,{name=modname..":painting"})
 					spawnent(pos)
 				end
-				waitdraw(pos,below,pid,x-mx*w,y-my*w,ur,ug,ub,false)
+				waitdraw(pl,pos,below,pid,x-mx*w,y-my*w,ur,ug,ub,false)
 			end
 		end
 	end end
 end
-local function draw(p,ur,ug,ub,sh)
-	print(minetest.get_node(p.above).name,minetest.get_node(p.under).name)
-	if not (nodecore.writing_writable(p.under) and nodecore.buildable_to(p.above)) then print("BAD") return end
+	local function draw(pl,p,ur,ug,ub,sh)
+	--print(minetest.get_node(p.above).name,minetest.get_node(p.under).name)
+	local abname=minetest.get_node(p.above).name
+	if not (nodecore.writing_writable(p.under) and (abname=="air" or abname==modname..":painting")) then --[[print("BAD")]] return end
 	local paint_to=p.above
 	local pp=p.intersection_normal
 	pp=vector.round(vector.normalize(pp))
@@ -225,8 +250,8 @@ local function draw(p,ur,ug,ub,sh)
 		spawnent(pos)
 	end
 	x,y=math.floor((x+0.5)*(w)+1),math.floor((y+0.5)*(w)+1)
-	print(string.format("painting %s-%s-%s at %s %s",ur,ug,ub,x,y))
-	waitdraw(pos,p.under,pid,x,y,ur,ug,ub,sh)
+	--print(string.format("painting %s-%s-%s at %s %s",ur,ug,ub,x,y))
+	waitdraw(pl,pos,p.under,pid,x,y,ur,ug,ub,sh)
 end
 minetest.register_abm({
 	label="painting aaa",
@@ -237,19 +262,25 @@ minetest.register_abm({
 		spawnent(pos)
 	end
 })
+local shwaba=1/16
+local function cbaba(x)
+	return math.floor(shwaba*255+x*(1-shwaba)+0.5)
+end
 local function to_cstr(c,m,y)
 	local r,g,b=5-c,5-m,5-y
-	return minetest.rgba(r*(255/5),g*(255/5),b*(255/5))
+	return minetest.rgba(cbaba(r*(255/5)),cbaba(g*(255/5)),cbaba(b*(255/5)))
 end
 local function gendesc(c,m,y)
 	return string.format("(TECHNICAL COLORNAME (HUMAN NAMES TODO): CYAN-MAGENTA-YELLOW (0-5): %s-%s-%s)",c,m,y)
 end
+local allpaints={}
 for c=0,5 do for m=0,5 do for y=0,5 do
 	local nn=modname..":paint_"..string.format("%s%s%s",c,m,y)
 	print(nn)
 	local cstr=to_cstr(c,m,y)
 	print(cstr)
-	minetest.register_craftitem(nn,{
+	allpaints[#allpaints+1]=nn
+	minetest.register_tool(nn,{
 		description="Paint",
 		inventory_image="nc_concrete_etched.png^[mask:nc_fire_lump.png^[multiply:"..cstr,
 		sounds=nodecore.sounds("nc_terrain_crunchy"),
@@ -259,6 +290,134 @@ for c=0,5 do for m=0,5 do for y=0,5 do
 		end
 	})
 end end end
+
+nodecore.register_soaking_aism({
+	label = "paint decomposing/composing",
+	fieldname = "ncpaint",
+	interval=2,
+	chance=1,
+	itemnames=allpaints,
+	soakrate=function(stack,data)
+		local pos = data.pos or data.player and data.player:get_pos()
+		if nodecore.quenched(pos) then
+			return -0.5
+		end
+		return 1
+	end,
+	soakcheck=function(data,stack)
+		local ss=math.ceil(65535/32)*data.total
+		local wear = math.max(0,stack:get_wear()+ss)
+		if wear>65535 then
+			stack:take_item(1)
+		else
+			stack:set_wear(wear)
+		end
+		return 0,stack
+	end
+})
+
+local flcidtopain
+
+local function randround(a)
+	local fl=math.floor(a)
+	local fr=a-fl
+	return math.random()>fr and fl or (fl+1)
+end
+
+do
+	local shapes = {
+		{name = "Bell", size = 1/4},
+		{name = "Cup", size = 1/4},
+		{name = "Rosette", size = 1/4},
+		{name = "Cluster", param2 = 2, size = 3/8},
+		{name = "Star", param2 = 4, size = 3/8},
+	}
+
+	local colors = {
+		{name = "Pink", color = "d23379"},
+		{name = "Red", color = "d80000"},
+		{name = "Orange", color = "c16100"},
+		{name = "Yellow", color = "baba00"},
+		{name = "White", color = "adadad"},
+		{name = "Azure", color = "39849b"},
+		{name = "Blue", color = "2424fe"},
+		{name = "Violet", color = "5900b2"},
+		{name = "Black", color = "202020"},
+	}
+
+	local function hextorgb(hex)
+		return tonumber("0x"..hex:sub(1,2)), tonumber("0x"..hex:sub(3,4)), tonumber("0x"..hex:sub(5,6))
+	end
+
+	local function rgbtomyrgb(r,g,b)
+		r,g,b=255-r,255-g,255-b
+		r,g,b=r/255*5,g/255*5,b/255*5
+		return r,g,b
+	end
+
+	flcidtopain=function(flcid)
+		local color=colors[flcid].color
+		local r,g,b = rgbtomyrgb(hextorgb(color))
+		return randround(r),randround(g),randround(b)
+	end
+end
+
+nodecore.register_craft({
+	label = "paint synthesis",
+	action = "pummel",
+	toolgroups = {thumpy=1},
+	nodes = {
+		{match = {groups={living_flower=1}},replace="air"}
+	},
+	before = function(pos)
+		local node = minetest.get_node(pos)
+		local def = minetest.registered_nodes[node.name]
+		local r,g,b = flcidtopain(def.nc_flower_color)
+		local iname=modname..":paint_"..r..g..b
+		nodecore.item_eject(pos,iname)
+	end
+})
+
+nodecore.register_craft({
+	label = "paint merge",
+	action="pummel",
+	toolgroups = {thumpy=1},
+	nodes = {
+		{match = {groups={nc_paint=1}},replace="air"},
+		{match = {groups={nc_paint=1}},replace="air", y=-1}
+	},
+	before = function(pos)
+		local posbot=vector.add(pos,vector.new(0,-1,0))
+		local node=nodecore.stack_get(pos)
+		local node1=nodecore.stack_get(posbot)
+		local def1 = minetest.registered_items[node:get_name()]
+		local def2=minetest.registered_items[node1:get_name()]
+		local r1,g1,b1=unpack(def1.nc_paint_color)
+		local r2,g2,b2=unpack(def2.nc_paint_color)
+		local r,g,b=(r1+r2)/2,(g1+g2)/2,(b1+b2)/2
+		r,g,b=randround(r),randround(g),randround(b)
+		local iname=modname..":paint_"..r..g..b
+		nodecore.item_eject(posbot,iname)
+	end
+})
+
+local function get_hand_range(pl)
+	local handreal=minetest.registered_items[""] or {}
+	local wieldplst=pl:get_wielded_item()
+	local handplst=pl:get_inventory():get_stack("hand",1)
+	local range
+	if wieldplst:get_count()>0 then
+		local w=minetest.registered_items[wieldplst:get_name()] or {}
+		range=range or w.range
+	end
+	if handplst:get_count()>0 then
+		local w=minetest.registered_items[handplst:get_name()] or {}
+		range=range or w.range
+	end
+	range=range or handreal.range
+	return range or 4
+end
+
 local pldb={}
 minetest.register_globalstep(function(dt)
 	for k,pl in ipairs(minetest.get_connected_players()) do
@@ -272,7 +431,8 @@ minetest.register_globalstep(function(dt)
 				local props=pl:get_properties()
 				local ff=vector.add(pl:get_eye_offset(),{x=0,y=props.eye_height,z=0})
 				local rcp=vector.add(pl:get_pos(),ff)
-				local vd=vector.multiply(pl:get_look_dir(),5)
+				--print(get_hand_range(pl))
+				local vd=vector.multiply(pl:get_look_dir(),get_hand_range(pl))
 				local rcp1,vd1=ll.rcp or rcp,ll.vd or vd
 				local step=1/4
 				for n=step,1,step do
@@ -282,7 +442,7 @@ minetest.register_globalstep(function(dt)
 					local cn=rc:next()
 					if cn then
 						local a,b,c=unpack(def.nc_paint_color)
-						draw(cn,a,b,c,not cc.sneak)
+						draw(pl,cn,a,b,c,not cc.sneak)
 					end
 				end
 				ll.rcp=rcp

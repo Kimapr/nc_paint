@@ -2,9 +2,14 @@
 local base64=require"base64"
 local fngen=require"fngen"
 local unpack=unpack or table.unpack
+local shwa=1/16
+local function cba(x)
+	return math.floor(shwa*255+x*(1-shwa)+0.5)
+end
 function gen(a,b,c,fn)
 	print(fn)
-	local e=os.execute(string.format("convert -size 1x1 canvas:\\#%s%s%s%s%s%s PNG24:textures/%s",a,a,b,b,c,c,fn))
+	local hex=string.format("#%02X%02X%02X",cba(a),cba(b),cba(c))
+	local e=os.execute(string.format("convert -size 1x1 canvas:\\%s PNG24:textures/%s",hex,fn))
 	if (type(e)=="number" and {e~=0} or {not e})[1] then
 		error(string.format("error: %s",e))
 	end
@@ -19,13 +24,14 @@ for n=1,6 do
 end
 local c=6
 local m=(15/(c-1))
+local mm=(255/(c-1))
 fns={}
 for qr=0,c-1 do
-	local r=colors[qr*m]
+	local r=qr*mm
 	for qg=0,c-1 do
-		local g=colors[qg*m]
+		local g=qg*mm
 		for qb=0,c-1 do
-			local b=colors[qb*m]
+			local b=qb*mm
 			local fn=fngen(qr,qg,qb)
 			assert(not fns[fn])
 			fns[fn]=true
