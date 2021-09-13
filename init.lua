@@ -294,15 +294,17 @@ end end end
 nodecore.register_soaking_aism({
 	label = "paint decomposing/composing",
 	fieldname = "ncpaint",
-	interval=2,
+	interval=5,
 	chance=1,
 	itemnames=allpaints,
 	soakrate=function(stack,data)
 		local pos = data.pos or data.player and data.player:get_pos()
-		if nodecore.quenched(pos) then
-			return -0.5
+		print("CCC",nodecore.quenched(pos))
+		local qnch=nodecore.quenched(pos)
+		if qnch then
+			return -0.25*qnch
 		end
-		return 1
+		return 0.5
 	end,
 	soakcheck=function(data,stack)
 		local ss=math.ceil(65535/32)*data.total
@@ -367,7 +369,7 @@ nodecore.register_craft({
 	action = "pummel",
 	toolgroups = {thumpy=1},
 	nodes = {
-		{match = {groups={living_flower=1}},replace="air"}
+		{match = {groups={flower_living=1}},replace="air"}
 	},
 	before = function(pos)
 		local node = minetest.get_node(pos)
