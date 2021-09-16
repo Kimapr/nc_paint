@@ -299,12 +299,12 @@ nodecore.register_soaking_aism({
 	itemnames=allpaints,
 	soakrate=function(stack,data)
 		local pos = data.pos or data.player and data.player:get_pos()
-		print("CCC",nodecore.quenched(pos))
 		local qnch=nodecore.quenched(pos)
 		if qnch then
 			return -0.25*qnch
 		end
-		return 0.5
+		local moist=#nodecore.find_nodes_around(pos,"group:moist",2)
+		return 0.5*(1-math.min(1,moist/6))
 	end,
 	soakcheck=function(data,stack)
 		local ss=math.ceil(65535/32)*data.total
