@@ -336,15 +336,15 @@ do
 	}
 
 	local colors = {
-		{name = "Pink", color = "d23379"},
-		{name = "Red", color = "d80000"},
-		{name = "Orange", color = "c16100"},
-		{name = "Yellow", color = "baba00"},
-		{name = "White", color = "adadad"},
-		{name = "Azure", color = "39849b"},
-		{name = "Blue", color = "2424fe"},
-		{name = "Violet", color = "5900b2"},
-		{name = "Black", color = "202020"},
+		{name = "Pink", color = "ff0080"},
+		{name = "Red", color = "ff0000"},
+		{name = "Orange", color = "ff8000"},
+		{name = "Yellow", color = "ffff00"},
+		{name = "White", color = "ffffff"},
+		{name = "Azure", color = "00ffff"},
+		{name = "Blue", color = "0000ff"},
+		{name = "Violet", color = "8000ff"},
+		{name = "Black", color = "000000"},
 	}
 
 	local function hextorgb(hex)
