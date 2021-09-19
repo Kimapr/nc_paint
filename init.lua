@@ -446,13 +446,7 @@ local function mix(c1,m1,y1,c2,m2,y2)
 	r2,g2,b2=1-c2/5,1-m2/5,1-y2/5
 	local h1,s1,v1=rgb_to_hsv(r1,g1,b1)
 	local h2,s2,v2=rgb_to_hsv(r2,g2,b2)
-	if math.min(s1,v1)==0 then
-		h1=h2
-	end
-	if math.min(s2,v2)==0 then
-		h2=h1
-	end
-	local h,s,v=hmix(h1,h2,s1,s2),(s1+s2)/2,(v1+v2)/2
+	local h,s,v=hmix(h1,h2,s1*v1,s2*v2),(s1+s2)/2,(v1+v2)/2
 	local r,g,b=hsv_to_rgb(h,s,v)
 	return (1-r)*5,(1-g)*5,(1-b)*5
 end
