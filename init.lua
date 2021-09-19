@@ -175,7 +175,7 @@ local function waitdraw(pl,pos,below,pid,x,y,ur,ug,ub,sh)
 						local ss=math.floor(65535/256)
 						local wear=wi:get_wear()+ss
 						if wear>=65535 then
-							wi:take_item(1)
+							wi:replace("nc_fire:lump_ash")
 						else
 							wi:set_wear(wear)
 						end
@@ -310,7 +310,7 @@ nodecore.register_soaking_aism({
 		local ss=math.ceil(65535/32)*data.total
 		local wear = math.max(0,stack:get_wear()+ss)
 		if wear>65535 then
-			stack:take_item(1)
+			stack:replace("nc_fire:lump_ash")
 		else
 			stack:set_wear(wear)
 		end
@@ -320,10 +320,11 @@ nodecore.register_soaking_aism({
 
 local flcidtopain
 
-local function randround(a)
+local function randround(a,rr)
 	local fl=math.floor(a)
 	local fr=a-fl
-	return math.random()>fr and fl or (fl+1)
+	rr=rr or math.random()
+	return (rr)>fr and fl or (fl+1)
 end
 
 do
@@ -360,7 +361,8 @@ do
 	flcidtopain=function(flcid)
 		local color=colors[flcid].color
 		local r,g,b = rgbtomyrgb(hextorgb(color))
-		return randround(r),randround(g),randround(b)
+		local rr=math.random()
+		return randround(r,rr),randround(g,rr),randround(b,rr)
 	end
 end
 
@@ -380,6 +382,81 @@ nodecore.register_craft({
 	end
 })
 
+local function rgb_to_hsv(r,g,b)
+	local ma,mi = math.max(r,g,b),math.min(r,g,b)
+	local h,s,v = ma,ma,ma
+	local d = ma-mi
+	s = ma==0 and 0 or d/ma
+	if ma==mi then
+		h=0
+	else
+		if ma==r then
+			h=(g-b)/d+(g<b and 6 or 0)
+		elseif ma==g then
+			h=(b-r)/d+2
+		elseif ma==b then
+			h=(r-g)/d+4
+		end
+		h=h/6
+	end
+	return h,s,v
+end
+
+local function hsv_to_rgb(h,s,v)
+	local r,g,b
+	local i=math.floor(h*6)
+	local f=h*6-i
+	local p=v*(1-s)
+	local q=v*(1-f*s)
+	local t=v*(1-(1-f)*s)
+	local i6=i%6
+	if i6==0 then
+		r,g,b=v,t,p
+	elseif i6==1 then
+		r,g,b=q,v,p
+	elseif i6==2 then
+		r,g,b=p,v,t
+	elseif i6==3 then
+		r,g,b=p,q,v
+	elseif i6==4 then
+		r,g,b=t,p,v
+	elseif i6==5 then
+		r,g,b=v,p,q
+	end
+	return r,g,b
+end
+
+local function hmix(h1,h2,w1,w2)
+	h1,h2=h1%1,h2%1
+	hm1,hp1=h1-1,h1+1
+	local dm,dp,dn=math.abs(hm1-h2),math.abs(hp1-h2),math.abs(h1-h2)
+	local md=math.min(dm,dp,dn)
+	if md==dm then
+		return ((hm1*w1+h2*w2)/(w1+w2))%1
+	elseif md==dp then
+		return ((hp1*w1+h2*w2)/(w1+w2))%1
+	elseif md==dn then
+		return ((h1*w1+h2*w2)/(w1+w2))%1
+	end
+	return error("wat")
+end
+
+local function mix(c1,m1,y1,c2,m2,y2)
+	r1,g1,b1=1-c1/5,1-m1/5,1-y1/5
+	r2,g2,b2=1-c2/5,1-m2/5,1-y2/5
+	local h1,s1,v1=rgb_to_hsv(r1,g1,b1)
+	local h2,s2,v2=rgb_to_hsv(r2,g2,b2)
+	if math.min(s1,v1)==0 then
+		h1=h2
+	end
+	if math.min(s2,v2)==0 then
+		h2=h1
+	end
+	local h,s,v=hmix(h1,h2,s1,s2),(s1+s2)/2,(v1+v2)/2
+	local r,g,b=hsv_to_rgb(h,s,v)
+	return (1-r)*5,(1-g)*5,(1-b)*5
+end
+
 nodecore.register_craft({
 	label = "paint merge",
 	action="pummel",
@@ -396,10 +473,13 @@ nodecore.register_craft({
 		local def2=minetest.registered_items[node1:get_name()]
 		local r1,g1,b1=unpack(def1.nc_paint_color)
 		local r2,g2,b2=unpack(def2.nc_paint_color)
-		local r,g,b=(r1+r2)/2,(g1+g2)/2,(b1+b2)/2
-		r,g,b=randround(r),randround(g),randround(b)
-		local iname=modname..":paint_"..r..g..b
-		nodecore.item_eject(posbot,iname)
+		local r,g,b=mix(r1,g1,b1,r2,g2,b2)
+		for n=1,2 do
+			local rr=math.random()
+			local r,g,b=randround(r,rr),randround(g,rr),randround(b,rr)
+			local iname=modname..":paint_"..r..g..b
+			nodecore.item_eject(posbot,iname)
+		end
 	end
 })
 
