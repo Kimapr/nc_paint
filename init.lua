@@ -367,19 +367,25 @@ do
 end
 
 nodecore.register_craft({
-	label = "paint synthesis",
-	action = "pummel",
-	toolgroups = {thumpy=1},
-	nodes = {
-		{match = {groups={flower_living=1}},replace="air"}
-	},
-	before = function(pos)
-		local node = minetest.get_node(pos)
-		local def = minetest.registered_nodes[node.name]
-		local r,g,b = flcidtopain(def.nc_flower_color)
-		local iname=modname..":paint_"..r..g..b
-		nodecore.item_eject(pos,iname)
-	end
+    label = "paint synthesis",
+    action = "pummel",
+    toolgroups = {thumpy=1},
+    nodes = {
+        {match = {groups={flower_living=1}},replace="air"}
+    },
+    before = function(pos)
+        local stack = nodecore.stack_get(pos)
+        local def
+        if (not stack) or stack:is_empty() then
+            local node = minetest.get_node(pos)
+            def = minetest.registered_nodes[node.name]
+        else
+            def = stack:get_definition()
+        end
+        local r,g,b = flcidtopain(def.nc_flower_color)
+        local iname=modname..":paint_"..r..g..b
+        nodecore.item_eject(pos,iname)
+    end
 })
 
 local function rgb_to_hsv(r,g,b)
