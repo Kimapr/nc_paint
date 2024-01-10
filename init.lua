@@ -272,9 +272,9 @@ local shwaba=1/16
 local function cbaba(x)
 	return math.floor(shwaba*255+x*(1-shwaba)+0.5)
 end
-local function to_cstr(c,m,y)
+local function to_mrgb(c,m,y)
 	local r,g,b=5-c,5-m,5-y
-	return minetest.rgba(cbaba(r*(255/5)),cbaba(g*(255/5)),cbaba(b*(255/5)))
+	return cbaba(r*(255/5)),cbaba(g*(255/5)),cbaba(b*(255/5))
 end
 local function gendesc(c,m,y)
 	return string.format("(TECHNICAL COLORNAME (HUMAN NAMES TODO): CYAN-MAGENTA-YELLOW (0-5): %s-%s-%s)",c,m,y)
@@ -283,15 +283,23 @@ local allpaints={}
 for c=0,5 do for m=0,5 do for y=0,5 do
 	local nn=modname..":paint_"..string.format("%s%s%s",c,m,y)
 	print(nn)
-	local cstr=to_cstr(c,m,y)
+	local r,g,b=to_mrgb(c,m,y)
+	local cstr=minetest.rgba(r,g,b)
 	print(cstr)
 	allpaints[#allpaints+1]=nn
+	local base_tex = "nc_concrete_etched.png^[mask:nc_fire_lump.png"
+	local tex=base_tex.."^[multiply:"..cstr
+	local overtex=tex.."^[mask:nc_paint_drymask_8.png"
 	minetest.register_tool(nn,{
 		description="Paint",
-		inventory_image="nc_concrete_etched.png^[mask:nc_fire_lump.png^[multiply:"..cstr,
+		inventory_rgb={r,g,b},
+		inventory_base=tex,
+		inventory_image=base_tex,
+		inventory_overlay=overtex,
+		color=minetest.rgba(r,g,b),
 		sounds=nodecore.sounds("nc_terrain_crunchy"),
 		nc_paint_color={c,m,y},
-		groups={nc_paint=1},
+		groups={nc_paint=1,flammable=1},
 		on_place=function()
 		end
 	})
@@ -300,26 +308,37 @@ end end end
 nodecore.register_soaking_aism({
 	label = "paint decomposing/composing",
 	fieldname = "ncpaint",
-	interval=5,
+	interval=3,
 	chance=1,
 	itemnames=allpaints,
 	soakrate=function(stack,data)
 		local pos = data.pos or data.player and data.player:get_pos()
 		local qnch=nodecore.quenched(pos)
 		if qnch then
-			return -0.25*qnch
+			return -1*qnch
 		end
 		local moist=#nodecore.find_nodes_around(pos,"group:moist",2)
-		return 0.5*(1-math.min(1,moist/6))
+		local hot=#nodecore.find_nodes_around(pos,"group:radiant_heat",2)
+		return 0.5*(1-math.min(1,moist/6)*1.6)+math.min(1,hot/2)*4
 	end,
 	soakcheck=function(data,stack)
 		local meta = stack:get_meta()
-		local off = data.total/8
+		local off = data.total/8 * (3/5)
 		local dry = math.max(0,math.min(0.95,meta:get_float("paint_dry")+off))
 		meta:set_float("paint_dry",dry)
-		local tex = "nc_paint_drymask_".. (1+math.floor(dry*(1/0.95)*3+0.5)) .. ".png"
-		tex = minetest.registered_items[stack:get_name()].inventory_image .. "^[mask:" .. tex
-		meta:set_string("inventory_image", tex)
+		local drynorm = dry*(1/0.95)
+		local tex = "nc_paint_drymask_".. (1+math.floor(drynorm*7+0.5)) .. ".png"
+		local def=minetest.registered_items[stack:get_name()]
+		tex = def.inventory_base .. "^[mask:" .. tex
+		local r,g,b = unpack(def.inventory_rgb)
+		local function int(a,b,...)
+			local o = math.floor(127*drynorm+a*(1-drynorm))
+			if b then return o,int(b,...) end
+			return o
+		end
+		meta:set_string("inventory_image", "^[opacity:0")
+		meta:set_string("inventory_overlay", tex)
+		meta:set_string("color",minetest.rgba(int(r,g,b)))
 		return 0,stack
 	end
 })
@@ -463,6 +482,11 @@ local function mix(c1,m1,y1,c2,m2,y2)
 	return (1-r)*5,(1-g)*5,(1-b)*5
 end
 
+local function paint_mixable(stack)
+	if stack:get_meta():get_float("paint_dry") > 1/16 then return false end
+	return true
+end
+
 nodecore.register_craft({
 	label = "paint merge",
 	action="pummel",
@@ -471,6 +495,12 @@ nodecore.register_craft({
 		{match = {groups={nc_paint=1}},replace="air"},
 		{match = {groups={nc_paint=1}},replace="air", y=-1}
 	},
+	check=function(pos)
+		local posbot=vector.add(pos,vector.new(0,-1,0))
+		local node=nodecore.stack_get(pos)
+		local node1=nodecore.stack_get(posbot)
+		return paint_mixable(node) and paint_mixable(node1)
+	end,
 	before = function(pos)
 		local posbot=vector.add(pos,vector.new(0,-1,0))
 		local node=nodecore.stack_get(pos)
@@ -484,6 +514,8 @@ nodecore.register_craft({
 			local rr=math.random()
 			local r,g,b=randround(r,rr),randround(g,rr),randround(b,rr)
 			local iname=modname..":paint_"..r..g..b
+			iname = ItemStack(iname)
+			iname:set_wear(math.round(node:get_wear()/2+node1:get_wear()/2))
 			nodecore.item_eject(posbot,iname)
 		end
 	end

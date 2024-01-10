@@ -4,7 +4,7 @@ local rand=require("random").new():seed(tonumber(seed)or 42)
 local function c(r,g,b,a)
 	io.write(string.char(r,g,b,a))
 end
-arg = (tonumber(arg)-1) / 3
+arg = (tonumber(arg)-1) / 8 * 0.8
 for y=1,16 do for x=1,16 do
 	local xx,yy=x-0.5,y-0.5 -- centerized
 	local dist = math.min(1,math.sqrt((xx-8)^2+(yy-14)^2)/8)
