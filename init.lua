@@ -175,7 +175,7 @@ local function waitdraw(pl,pos,below,pid,x,y,ur,ug,ub,sh)
 						local ss=math.floor(65535/256)
 						local wear=wi:get_wear()+ss
 						if wear>=65535 then
-							wi:replace("nc_fire:lump_ash")
+							wi=ItemStack("nc_fire:lump_ash")
 						else
 							wi:set_wear(wear)
 						end
@@ -310,7 +310,7 @@ nodecore.register_soaking_aism({
 		local ss=math.ceil(65535/32)*data.total
 		local wear = math.max(0,stack:get_wear()+ss)
 		if wear>65535 then
-			stack:replace("nc_fire:lump_ash")
+			return 0,ItemStack("nc_fire:lump_ash")
 		else
 			stack:set_wear(wear)
 		end
@@ -506,7 +506,7 @@ minetest.register_globalstep(function(dt)
 		local wi=pl:get_wielded_item()
 		local name=pl:get_player_name()
 		local def=minetest.registered_items[wi:get_name()]
-		if def.groups.nc_paint==1 then
+		if def and def.groups.nc_paint==1 then
 			local cc=pl:get_player_control()
 			if cc.place then
 				local ll=pldb[name] or {}
