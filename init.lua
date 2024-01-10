@@ -172,15 +172,18 @@ local function waitdraw(pl,pos,below,pid,x,y,ur,ug,ub,sh)
 					local aur,aug,aub=unpack(def.nc_paint_color or {})
 					if aur==ur and aug==ug and aub==ub then
 						--print("WEAR")
-						local ss=math.floor(65535/256)
+						local ss=math.floor(65535/768)
 						local wear=wi:get_wear()+ss
+						local do_set=math.random()>wi:get_meta():get_float("paint_dry")
 						if wear>=65535 then
-							wi=ItemStack("nc_fire:lump_ash")
+							wi=ItemStack()
 						else
 							wi:set_wear(wear)
 						end
 						pl:set_wielded_item(wi)
-						buf:set(x,y,ur,ug,ub)
+						if do_set then
+							buf:set(x,y,ur,ug,ub)
+						end
 					else
 						--print("BBBBBBBB")
 					end
@@ -220,7 +223,7 @@ local function waitdraw(pl,pos,below,pid,x,y,ur,ug,ub,sh)
 		end
 	end end
 end
-	local function draw(pl,p,ur,ug,ub,sh)
+	local function draw(pl,p,ur,ug,ub,sh,ll)
 	--print(minetest.get_node(p.above).name,minetest.get_node(p.under).name)
 	local abname=minetest.get_node(p.above).name
 	if not (nodecore.writing_writable(p.under) and (abname=="air" or abname==modname..":painting")) then --[[print("BAD")]] return end
@@ -245,11 +248,14 @@ end
 		x,y=rp.x,rp.z
 	end
 	local pos=p.above
+	x,y=math.floor((x+0.5)*(w)+1),math.floor((y+0.5)*(w)+1)
+	local phash = vector.to_string(p.under).."_("..x..","..y..")"
+	if phash==ll.phash then return end
+	ll.phash=phash
 	if minetest.get_node_or_nil(pos) and minetest.get_node(pos).name~=modname..":painting" then
 		minetest.set_node(pos,{name=modname..":painting"})
 		spawnent(pos)
 	end
-	x,y=math.floor((x+0.5)*(w)+1),math.floor((y+0.5)*(w)+1)
 	--print(string.format("painting %s-%s-%s at %s %s",ur,ug,ub,x,y))
 	waitdraw(pl,pos,p.under,pid,x,y,ur,ug,ub,sh)
 end
@@ -307,13 +313,13 @@ nodecore.register_soaking_aism({
 		return 0.5*(1-math.min(1,moist/6))
 	end,
 	soakcheck=function(data,stack)
-		local ss=math.ceil(65535/32)*data.total
-		local wear = math.max(0,stack:get_wear()+ss)
-		if wear>65535 then
-			return 0,ItemStack("nc_fire:lump_ash")
-		else
-			stack:set_wear(wear)
-		end
+		local meta = stack:get_meta()
+		local off = data.total/8
+		local dry = math.max(0,math.min(0.95,meta:get_float("paint_dry")+off))
+		meta:set_float("paint_dry",dry)
+		local tex = "nc_paint_drymask_".. (1+math.floor(dry*(1/0.95)*3+0.5)) .. ".png"
+		tex = minetest.registered_items[stack:get_name()].inventory_image .. "^[mask:" .. tex
+		meta:set_string("inventory_image", tex)
 		return 0,stack
 	end
 })
@@ -434,7 +440,7 @@ end
 
 local function hmix(h1,h2,w1,w2)
 	h1,h2=h1%1,h2%1
-	hm1,hp1=h1-1,h1+1
+	local hm1,hp1=h1-1,h1+1
 	local dm,dp,dn=math.abs(hm1-h2),math.abs(hp1-h2),math.abs(h1-h2)
 	local md=math.min(dm,dp,dn)
 	if md==dm then
@@ -448,8 +454,8 @@ local function hmix(h1,h2,w1,w2)
 end
 
 local function mix(c1,m1,y1,c2,m2,y2)
-	r1,g1,b1=1-c1/5,1-m1/5,1-y1/5
-	r2,g2,b2=1-c2/5,1-m2/5,1-y2/5
+	local r1,g1,b1=1-c1/5,1-m1/5,1-y1/5
+	local r2,g2,b2=1-c2/5,1-m2/5,1-y2/5
 	local h1,s1,v1=rgb_to_hsv(r1,g1,b1)
 	local h2,s2,v2=rgb_to_hsv(r2,g2,b2)
 	local h,s,v=hmix(h1,h2,s1*v1,s2*v2),(s1+s2)/2,(v1+v2)/2
@@ -524,7 +530,7 @@ minetest.register_globalstep(function(dt)
 					local cn=rc:next()
 					if cn then
 						local a,b,c=unpack(def.nc_paint_color)
-						draw(pl,cn,a,b,c,not cc.sneak)
+						draw(pl,cn,a,b,c,not cc.sneak,ll)
 					end
 				end
 				ll.rcp=rcp
